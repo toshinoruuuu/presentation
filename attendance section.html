@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attendify</title>
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <!-- Bootswatch Simplex Theme -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootswatch/4.5.2/simplex/bootstrap.min.css">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="styles.css">
+    <!-- Another Custom CSS-->
+    <link rel="stylesheet" href="basta.css">
+</head>
+
+<body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark" style="background-color: #A40000;">
+        <a class="navbar-brand" href="homepage.html">UE | Attendify</a>
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav"
+            aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav">
+                <li class="nav-item">
+                    <a class="nav-link" href="homepage.html">Home</a>
+                </li>
+                <li class="nav-item active">
+                    <a class="nav-link" href="classes selection.html">Classes <span class="sr-only">(current)</span></a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="index.html">Log Out</a>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- Class Details -->
+    <div class="container mt-4">
+        <div class="card">
+            <div class="card-header" style="background-color: #A40000; color: white;">
+                <h3 id="classTitle" class="mb-0">Class Details</h3>
+            </div>
+            <div class="card-body">
+
+                <div class="class-details">
+                    <p><strong>Room:</strong> <span id="classRoom"></span></p>
+                    <p><strong>Date: </strong><span id="date"></span></p>
+                    <p>‎</p>
+                </div>
+                <div class="qr-container">
+                    <div id="qrcode" class="qr-code"></div>
+                </div>
+                <p><strong>Class Time: </strong><input type="time" id="startTimeInput"> - <input type="time"
+                        id="endTimeInput"></p>
+                <button class="btn btn-danger" id="updateTimeButton">Update Time</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Attendance Table -->
+    <div class="container mt-4">
+        <div class="card">
+            <div class="card-header" style="background-color: #A40000; color: white;">
+                <h3 class="mb-0">Class List</h3>
+            </div>
+            <div class="card-body">
+                <table class="table table-bordered table-striped">
+                    <thead class="thead-dark">
+                        <tr>
+                            <th>Student ID</th>
+                            <th>Name</th>
+                            <th>Role</th>
+                            <th>Status</th>
+                            <th>Timestamp</th>
+                        </tr>
+                    </thead>
+                    <tbody id="studentTable"></tbody>
+                </table>
+                <!-- Reset and Export Button -->
+                <button class="btn btn-danger" id="resetButton">Reset</button>
+                <button class="btn" style="background-color: #A40000; color: white;" id="exportBtn">Export to
+                    CSV</button>
+                <button class-="btn" style="background-color: #A40000; color: white;" id="sf2button">Export
+                    Summary</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase Script -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
+        import { getDatabase, ref, remove, get, set, onChildAdded, onChildChanged, update } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-database.js";
+        import * as XLSX from "https://cdn.sheetjs.com/xlsx-0.19.3/package/xlsx.mjs";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyA0hTRuEgjrP9YQ4LwkHcSUf7xkdl9lBgI",
+            authDomain: "attendify12-ai.firebaseapp.com",
+            databaseURL: "https://attendify12-ai-default-rtdb.asia-southeast1.firebasedatabase.app/",
+            projectId: "attendify12-ai",
+            storageBucket: "attendify12-ai.firebasestorage.app",
+            messagingSenderId: "374044642888",
+            appId: "1:374044642888:web:44706986d500af43a0927d"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const classId = urlParams.get("classId");
+        const teacherId = urlParams.get("teacherId");
+
+        let studentsData = [];
+        let classTime;
+
+        if (!teacherId || !classId) {
+            alert("Missing teacher or class ID!");
+            console.error("No info found: teacherId or classId is missing.");
+        } else {
+            fetchClassDetails();
+        }
+
+        async function fetchClassDetails() {
+            if (!classId) {
+                alert("No class selected!");
+                return;
+            }
+
+            try {
+                console.log("Fetching class details...");
+                const classRef = ref(db, `classes/${teacherId}/${classId}`);
+                const snapshot = await get(classRef);
+
+                if (snapshot.exists()) {
+                    const classData = snapshot.val();
+                    console.log("Class Data:", classData);
+
+                    function convertTo12HourFormat(time) {
+                        let [hour, minute] = time.split(":").map(Number);
+                        let period = hour >= 12 ? "PM" : "AM";
+                        hour = hour % 12 || 12; // Convert 0 to 12 for midnight
+                        return `${hour}:${minute.toString().padStart(2, "0")} ${period}`;
+                    }
+
+                    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+                    document.getElementById("date").textContent = new Date().toLocaleDateString('en-US', options);
+                    document.getElementById("classTitle").innerText = `Class: ${classData.section}`;
+                    document.getElementById("classRoom").innerText = classData.room;
+
+                    // Convert startTime and endTime to 12-hour format
+                    classTime = `${convertTo12HourFormat(classData.startTime)} - ${convertTo12HourFormat(classData.endTime)}`;
+                    document.getElementById("startTimeInput").value = classData.startTime;
+                    document.getElementById("endTimeInput").value = classData.endTime;
+                    console.log(`Class Time: ${classTime}`); // Debugging log
+                    const tbody = document.getElementById("studentTable");
+                    tbody.innerHTML = "";
+
+                    studentsData = classData.students || [];
+                    console.log("Students Data:", studentsData);
+
+                    studentsData.forEach((student) => {
+                        console.log(`Adding student: ${student.name}`);
+
+                        const row = `<tr data-id="${student.id}">
+                        <td>${student.id}</td>
+                        <td>${student.name}</td>
+                        <td>${student.role}</td>
+                        <td id="status-${student.id}">-</td>
+                        <td>-</td>
+                        </tr>`;
+                        tbody.innerHTML += row;
+
+                        set(ref(db, `attendance/${classId}/${student.id}`), {
+                            id: student.id,
+                            status: "-",
+                            timestamp: new Date().toISOString()
+                        });
+
+                        // Apply color for "Absent" status immediately
+                        const statusCell = document.querySelector(`#status-${student.id}`);
+                        if (statusCell) {
+                            statusCell.style.color = "red";
+                        }
+                    });
+
+                    listenForLoginChanges();
+                    listenForAttendanceChanges();
+                } else {
+                    alert("Class not found!");
+                }
+            } catch (error) {
+                console.error("Error fetching class data:", error);
+            }
+        }
+
+        function updateClassTime() {
+            const newStartTime = document.getElementById("startTimeInput").value;
+            const newEndTime = document.getElementById("endTimeInput").value;
+
+            if (!newStartTime || !newEndTime) {
+                alert("Please enter both start and end times.");
+                return;
+            }
+
+            const classRef = ref(db, `classes/${teacherId}/${classId}`);
+
+            update(classRef, {
+                startTime: newStartTime,
+                endTime: newEndTime
+            })
+                .then(() => {
+                    alert("Class time updated successfully!");
+                    updateTimeButton.style.display = "none"; // Hide the button immediately after a successful update
+                })
+                .catch((error) => {
+                    console.error("Error updating class time:", error);
+                    alert("Failed to update class time.");
+                });
+
+        }
+
+
+        // Attach event listener to the button
+        document.getElementById("updateTimeButton").addEventListener("click", updateClassTime);
+
+        // Initially hide the button
+        updateTimeButton.style.display = "none";
+
+        // Function to show the button when interacting with time inputs
+        function showUpdateButton() {
+            updateTimeButton.style.display = "block";
+        }
+
+        // Attach event listeners to both time inputs
+        startTimeInput.addEventListener("input", showUpdateButton);
+        endTimeInput.addEventListener("input", showUpdateButton);
+
+        async function markAbsentAfterEndTime() {
+    console.log("Checking for absent students after class ends...");
+
+    if (!classId) return;
+
+    const classRef = ref(db, `classes/${teacherId}/${classId}`);
+    const classSnapshot = await get(classRef);
+
+    if (classSnapshot.exists()) {
+        const classData = classSnapshot.val();
+        const startTime = classData.startTime; // Get the start time from class data
+        const endTime = classData.endTime; // Get the end time from class data
+
+        // Debugging the values of startTime and endTime
+        console.log("Class Data:", classData); // Full class data to inspect values
+        console.log("Start Time:", startTime);
+        console.log("End Time:", endTime);
+
+        const today = new Date().toDateString();
+        const classStartDateTime = new Date(`${today} ${startTime}:00`); // Start time for today
+        const classEndDateTime = new Date(`${today} ${endTime}:00`); // End time for today
+        const currentTime = new Date();
+
+        // Debugging the class start and end date-time calculations
+        console.log("Class Start DateTime:", classStartDateTime);
+        console.log("Class End DateTime:", classEndDateTime);
+        console.log("Current Time:", currentTime);
+
+        // Check if the current time is after class end time
+        if (currentTime > classEndDateTime) {
+            console.log("Class has ended. Marking absent students...");
+
+            const attendanceRef = ref(db, `attendance/${classId}`);
+            const attendanceSnapshot = await get(attendanceRef);
+
+            if (attendanceSnapshot.exists()) {
+                const attendanceData = attendanceSnapshot.val();
+
+                for (const studentId in attendanceData) {
+                    let studentStatus = attendanceData[studentId].status;
+
+                    // Only mark students absent if they were never marked as Present or Late
+                    if (studentStatus === "-") {
+                        console.log(`Marking ${studentId} as Absent`);
+
+                        // Update the attendance status without overwriting other data
+                        update(ref(db, `attendance/${classId}/${studentId}`), {
+                            status: "Absent",
+                            timestamp: new Date().toISOString()
+                        });
+                    }
+                }
+            }
+        } else if (currentTime < classStartDateTime) {
+            console.log("Class hasn't started yet. No changes made.");
+        } else {
+            console.log("Class is still ongoing. No changes made.");
+        }
+    } else {
+        console.log("Class not found.");
+    }
+}
+
+
+        // Listen for attendance status changes in real-time
+        function listenForAttendanceChanges() {
+            console.log("Listening for attendance changes...");
+            const attendanceRef = ref(db, `attendance/${classId}`);
+
+            onChildChanged(attendanceRef, (snapshot) => {
+                const attendanceData = snapshot.val();
+                console.log("Attendance data changed:", attendanceData);
+
+                // Find the student's row in the table by student ID
+                const studentId = attendanceData.id;
+                const status = attendanceData.status;
+
+                // Find the status cell in the table by student ID
+                const statusCell = document.querySelector(`#status-${studentId}`);
+
+                if (statusCell) {
+                    // Update the status text in the table
+                    statusCell.innerText = status;
+
+                    // Apply color based on the attendance status
+                    switch (status) {
+                        case "Absent":
+                            statusCell.style.color = "red"; // Set color to red for "Absent"
+                            break;
+                        case "Present":
+                            statusCell.style.color = "green"; // Set color to green for "Present"
+                            break;
+                        case "Late":
+                            statusCell.style.color = "orange"; // Set color to orange for "Late"
+                            break;
+                        default:
+                            statusCell.style.color = "-"; // Reset to default if status is unknown
+                            break;
+                    }
+
+                    // Update the timestamp column if necessary
+                    const timestampCell = statusCell.nextElementSibling; // Assuming the timestamp is in the next <td>
+                    if (timestampCell) {
+                        timestampCell.innerText = new Date(attendanceData.timestamp).toLocaleString();
+                    }
+                } else {
+                    // If the row doesn't exist, create a new one (you can do this if necessary)
+                    const tbody = document.getElementById("studentTable");
+                    const newRow = `<tr data-id="${studentId}">
+                <td>${attendanceData.id}</td>
+                <td>${attendanceData.name}</td>
+                <td>${attendanceData.role}</td>
+                <td id="status-${studentId}">${status}</td>
+                <td>${new Date(attendanceData.timestamp).toLocaleString()}</td>
+            </tr>`;
+                    tbody.innerHTML += newRow;
+                }
+            });
+        }
+
+        function listenForLoginChanges() {
+            console.log("Listening for login changes...");
+            const loginsRef = ref(db, "logins");
+
+            onChildAdded(loginsRef, (snapshot) => {
+                console.log("New login detected:", snapshot.val());
+                const loginData = snapshot.val();
+
+                // Convert the login ID to a string to match with attendance ID
+                const loginId = loginData.id.toString(); // Convert to string
+                console.log("Login ID (string):", loginId);  // Debugging line to check login ID
+
+                // Update attendance for the student by matching IDs
+                updateAttendance(loginId);
+            });
+
+            onChildChanged(loginsRef, (snapshot) => {
+                console.log("Login status changed:", snapshot.val());
+                const loginData = snapshot.val();
+
+                // Convert the login ID to a string to match with attendance ID
+                const loginId = loginData.id.toString(); // Convert to string
+                console.log("Login ID (string):", loginId);  // Debugging line to check login ID
+
+                // Update attendance for the student by matching IDs
+                updateAttendance(loginId);
+            });
+        }
+
+        async function updateAttendance(studentId) {
+            console.log(`Updating attendance for ${studentId}...`);
+
+            const attendanceRef = ref(db, `attendance/${classId}/${studentId}`);
+            console.log("Attendance Reference Path:", `attendance/${classId}/${studentId}`);  // Debugging path
+
+            // Fetch the current attendance record for the student
+            const snapshot = await get(attendanceRef);
+
+            if (snapshot.exists()) {
+                const currentTime = new Date();
+                const classDateTime = new Date(`${new Date().toDateString()} ${classTime}:00`);
+                let status = currentTime <= classDateTime ? "Present" : "Late";
+
+                console.log(`Marking ${studentId} as ${status}`);
+
+                // Update the attendance status in Firebase
+                set(attendanceRef, {
+                    id: studentId,
+                    status: status,
+                    timestamp: new Date().toISOString()
+                });
+            } else {
+                console.warn(`No attendance record found for ${studentId}, skipping update.`);
+            }
+        }
+
+        // Function to reset attendance for all students
+        async function resetAttendance() {
+            console.log("Resetting attendance for all students...");
+
+            const attendanceRef = ref(db, `attendance/${classId}`);
+            const snapshot = await get(attendanceRef);
+
+            if (snapshot.exists()) {
+                const attendanceData = snapshot.val();
+                for (const studentId in attendanceData) {
+                    // Reset attendance status to "Absent"
+                    set(ref(db, `attendance/${classId}/${studentId}`), {
+                        id: studentId,
+                        status: "-",
+                        timestamp: new Date().toISOString() // Set a new timestamp
+                    });
+                    console.log(`Attendance reset for student ID: ${studentId}`);
+
+                    // Find the student's row in the table and update the status and timestamp
+                    const statusCell = document.querySelector(`#status-${studentId}`);
+                    if (statusCell) {
+                        statusCell.innerText = "-"; // Reset status to "Absent"
+                    }
+
+                    // Reset the timestamp to "-"
+                    const timestampCell = statusCell?.nextElementSibling; // Assuming the timestamp is in the next <td>
+                    if (timestampCell) {
+                        timestampCell.innerText = "-";  // Reset timestamp to "-"
+                    }
+                }
+            }
+        }
+
+
+        // Function to reset the logins node in Firebase and reset attendance
+        function resetLogins() {
+            const loginsRef = ref(db, "logins");
+            remove(loginsRef)
+                .then(() => {
+                    console.log("Logins reset successfully!");
+                    resetAttendance(); // Reset attendance when logins are cleared
+                })
+                .catch((error) => {
+                    console.error("Error resetting logins: ", error);
+                    alert("Failed to reset logins.");
+                });
+        }
+
+        // Attach the reset functionality to the reset button
+        document.getElementById("resetButton").addEventListener("click", resetLogins);
+
+
+        // Export Button Functionality
+        document.getElementById('exportBtn').addEventListener('click', () => {
+            // Prepare CSV data
+            const rows = [['Student ID', 'Name', 'Role', 'Timestamp', 'Status']];
+            const table = document.getElementById('studentTable');  // Reference to the table where attendance is listed
+            const tableRows = table.getElementsByTagName('tr');
+
+            for (let row of tableRows) {
+                const rowData = Array.from(row.getElementsByTagName('td')).map(cell => cell.textContent);
+                rows.push(rowData);
+            }
+
+            // Create CSV file content
+            const csvContent = rows.map(row => row.join(',')).join('\n');
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'attendance_list.csv';
+            link.click();
+        });
+
+        async function exportSF2() {
+            const attendanceRef = ref(db, "attendance");
+            const snapshot = await get(attendanceRef);
+
+            if (!snapshot.exists()) {
+                console.error("No attendance data found");
+                return;
+            }
+
+            const attendanceData = snapshot.val();
+            const classesRef = ref(db, "classes");
+            const classesSnapshot = await get(classesRef);
+
+            if (!classesSnapshot.exists()) {
+                console.error("No class data found");
+                return;
+            }
+
+            const classesData = classesSnapshot.val();
+            const sheetData = [];
+
+            // Loop through attendance data
+            Object.keys(attendanceData).forEach(timestamp => {
+                const students = attendanceData[timestamp];
+
+                // Loop through each student in the attendance data by timestamp
+                Object.keys(students).forEach(studentId => {
+                    const attendanceRecord = students[studentId];
+
+                    // Find the class that the student is enrolled in
+                    let studentName = "Unknown"; // Default value
+
+                    // Loop through all classes and check for matching studentId
+                    Object.keys(classesData).forEach(classId => {
+                        const classData = classesData[classId];
+
+                        // Check if classData has 'students' and search for the student
+                        if (classData.students && Array.isArray(classData.students)) {
+                            const student = classData.students.find(s => s.id === studentId);
+                            if (student) {
+                                studentName = student.name; // Set the name if found
+                            }
+                        }
+                    });
+
+                    const row = { "Student Name": studentName };
+
+                    // Add the date and attendance status
+                    row[attendanceRecord.timestamp.split('T')[0]] = attendanceRecord.status;
+
+                    sheetData.push(row);
+                });
+            });
+
+            // Generate the Excel file
+            const worksheet = XLSX.utils.json_to_sheet(sheetData, { header: ["Student Name"] });
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "SF2 Attendance");
+            XLSX.writeFile(workbook, "SF2_Attendance.xlsx");
+        }
+
+
+        document.getElementById("sf2button").addEventListener("click", exportSF2);
+
+
+
+
+        setTimeout(markAbsentAfterEndTime);
+        fetchClassDetails();
+    </script>
+
+
+    <!-- Firebase and QR Code Script -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://cdn.rawgit.com/davidshimjs/qrcodejs/gh-pages/qrcode.min.js"></script>
+    <script>
+        // QR Code Generator Function
+        function generateQRCode() {
+            var baseUrl = "https://toshinoruuuu.github.io/ict312checklang/";
+            var randomQuery = Math.random().toString(36).substring(2, 15);
+            var finalUrl = baseUrl + "?id=" + randomQuery;
+
+            // Clear the previous QR code
+            document.getElementById("qrcode").innerHTML = "";
+
+            // Generate the new QR code
+            new QRCode(document.getElementById("qrcode"), {
+                text: finalUrl,
+                width: 200,
+                height: 200,
+                colorDark: "#A40000",
+                colorLight: "#ffffff",
+                correctLevel: QRCode.CorrectLevel.H
+            });
+
+            // Add the logo to the QR code
+            var logo = document.createElement("img");
+            logo.src = "ue-logo.png"; // Path to your logo
+            logo.classList.add("logo");
+            document.getElementById("qrcode").appendChild(logo);
+        }
+
+        // Set an interval to generate a new QR code every 5 seconds
+        setInterval(generateQRCode, 5000);
+
+        // Generate an initial QR code as soon as the page loads
+        generateQRCode();
+    </script>
+</body>
+
+</html>
