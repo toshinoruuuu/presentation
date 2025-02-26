@@ -557,42 +557,38 @@
     </script>
 
 
-    <!-- Firebase and QR Code Script -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
-    <script src="https://cdn.rawgit.com/davidshimjs/qrcodejs/gh-pages/qrcode.min.js"></script>
-    <script>
-        // QR Code Generator Function
-        function generateQRCode() {
-            var baseUrl = "https://toshinoruuuu.github.io/ict312checklang/";
-            var randomQuery = Math.random().toString(36).substring(2, 15);
-            var finalUrl = baseUrl + "?id=" + randomQuery;
+<!-- Firebase and QR Code Script -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+<script src="https://cdn.rawgit.com/davidshimjs/qrcodejs/gh-pages/qrcode.min.js"></script>
+<script>
+    // QR Code Generator Function
+    function generateQRCode() {
+        var baseUrl = "https://toshinoruuuu.github.io/presentation/";
+        var randomQuery = Math.random().toString(36).substring(2, 15);
+        var finalUrl = baseUrl + "?id=" + randomQuery;
 
-            // Clear the previous QR code
-            document.getElementById("qrcode").innerHTML = "";
+        // Clear the previous QR code
+        document.getElementById("qrcode").innerHTML = "";
 
-            // Generate the new QR code
-            new QRCode(document.getElementById("qrcode"), {
-                text: finalUrl,
-                width: 200,
-                height: 200,
-                colorDark: "#A40000",
-                colorLight: "#ffffff",
-                correctLevel: QRCode.CorrectLevel.H
-            });
+        // Generate the new QR code
+        new QRCode(document.getElementById("qrcode"), {
+            text: finalUrl,
+            width: 200,
+            height: 200,
+            colorDark: "#A40000",
+            colorLight: "#ffffff",
+            correctLevel: QRCode.CorrectLevel.H
+        });
 
-            // Add the logo to the QR code
-            var logo = document.createElement("img");
-            logo.src = "ue-logo.png"; // Path to your logo
-            logo.classList.add("logo");
-            document.getElementById("qrcode").appendChild(logo);
-        }
+        // Add the logo to the QR code
+        var logo = document.createElement("img");
+        logo.src = "ue-logo.png"; // Path to your logo
+        logo.classList.add("logo");
+        document.getElementById("qrcode").appendChild(logo);
+    }
 
-        // Set an interval to generate a new QR code every 5 seconds
-        setInterval(generateQRCode, 5000);
-
-        // Generate an initial QR code as soon as the page loads
-        generateQRCode();
-    </script>
+    // Generate an initial QR code as soon as the page loads
+    generateQRCode();
+</script>
 </body>
-
 </html>
