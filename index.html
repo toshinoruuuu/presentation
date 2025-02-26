@@ -65,7 +65,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
-        import { getDatabase, ref, get, push } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-database.js";
+        import { getDatabase, ref, get, push, set } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-database.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyA0hTRuEgjrP9YQ4LwkHcSUf7xkdl9lBgI",
@@ -108,12 +108,26 @@
                     const storedPassword = userData.password.replace(/-/g, "/");
 
                     if (storedPassword === password) {
+                        // Log attendance for students and store teacher login
                         if (isTeacher) {
                             // Store Teacher ID in localStorage
                             localStorage.setItem("teacherID", studentId);
+                        } else {
+                            // Log Student login in the "logins" node
+                            const loginsRef = ref(database, 'logins/');
+                            push(loginsRef, {
+                                id: userData[isTeacher ? 'teacherId' : 'studentId'],
+                                name: userData.name,
+                                timestamp: new Date().toISOString(),
+                                role: isTeacher ? "Teacher" : "Student"
+                            }).then(() => {
+                                console.log(`${isTeacher ? "Teacher" : "Student"} login recorded.`);
+                            }).catch(error => {
+                                console.error("Error recording login:", error);
+                            });
                         }
 
-                        showSuccessMessage(studentId, userData.name, isTeacher);
+                        showSuccessMessage(userData[isTeacher ? 'teacherId' : 'studentId'], userData.name, isTeacher);
                     } else {
                         showErrorMessage('Incorrect password.');
                     }
@@ -124,6 +138,7 @@
                 showErrorMessage('An error occurred. Please try again.');
                 console.error(error);
             });
+
         }
 
 
